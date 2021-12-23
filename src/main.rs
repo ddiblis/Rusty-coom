@@ -6,7 +6,7 @@ use bytes::Buf;
 use std::io::{Cursor};
 
 use select::document::Document;
-use select::predicate::{Class};
+use select::predicate::{Class, Name};
 use http::{HeaderMap, HeaderValue, header::{COOKIE}};
 
 async fn get_dom(url: &str) -> Result<Document, Box<dyn std::error::Error>> {
@@ -34,30 +34,50 @@ fn gen_links(doc: &Document, url: &str, class_name: &str) -> Result<Vec<String>,
     for node in doc.find(Class(class_name)) {
         let name = node.find(Class("fancy-link")).next();
         match name {
-            Some(value) => {links.push([&url[0..url.len()-12], value.attr("href").unwrap()].join(""))}
+            Some(value) => {links.push([&url[0..url.len()-8], value.attr("href").unwrap()].join(""))}
             None => {}
         }
     }
     Ok(links)
 }
 
+fn get_page_num(doc: &Document) -> Result<usize, Box<dyn std::error::Error>>{
+    let mut page_len = 0;
+    for node in doc.find(Class("paginator")).next() {
+        let small_node = node.find(Name("small")).next().unwrap().text();
+        let split = small_node.split(" ").last().unwrap();
+        let num: usize = split[0..split.len()-1].parse().unwrap();
+        page_len = num / 25 + 1;
+    }
+    Ok(page_len)
+}
+
 #[tokio::main]
 async fn main() {
 
-    return artists("https://coomer.party/artists").await.unwrap();
+    return artists().await.unwrap();
 }
 
 
-async fn artists(url: &str) -> Result<(), Box<dyn std::error::Error>>{ 
-    let artist_document = get_dom(&url).await.unwrap();
-    let artist_links = gen_links(&artist_document, &url, "user-card__name").unwrap();
+async fn artists() -> Result<(), Box<dyn std::error::Error>>{
+    let url = "https://coomer.party/artists?o=";
 
-    println!("{:?}", artist_links);
+    let artist_document = get_dom(&url).await.unwrap();
+    let artist_page_len = get_page_num(&artist_document).unwrap();
+
+    for i in 1..artist_page_len {
+        println!("{}{:?}", &url, i*25);
+        let artist_links = gen_links(&artist_document, &format!("{}{:?}", &url, i*25), "user-card__name").unwrap();
+        println!("{:?}", artist_links);
+    }
+
+  
+
     // for link in artist_links.iter() {
-    //     let posts_document = get_dom(&link).await.unwrap();
-    //     let posts_links = gen_links(&posts_document, &url, "post-card__link");
-        
-    //     println!("{:?}", posts_links);
+    //         let posts_document = get_dom(&link).await.unwrap();
+    //         let posts_links = gen_links(&posts_document, &url, "post-card__link");
+
+    //         println!("{:?}", posts_links);    
     // }
     Ok(())
 }
