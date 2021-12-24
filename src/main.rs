@@ -69,10 +69,13 @@ async fn get_media_links(url: &str, base_url: &str) -> Result<Vec<String>, Box<d
 
     for item in items {
         let print = match item {
-            value if value.attr("href") != None => {value.attr("href")}
-            value => {value.find(Name("img")).next().unwrap().attr("src")}
+            value if value.attr("href") != None => { value.attr("href") }
+            value if value.find(Name("img")).next().unwrap().attr("src") != None => { value.find(Name("img")).next().unwrap().attr("src") }
+            _ => {Some("No")}
         };
-        links.push([&base_url, print.unwrap()].join(""));
+        if print.unwrap() != "No" {
+            links.push([&base_url, print.unwrap()].join(""));
+        }
     }
     
     Ok(links)
@@ -116,6 +119,7 @@ async fn artists() -> Result<(), Box<dyn std::error::Error>> {
 
                 for li in posts_links.iter() { 
                     let media_links = get_media_links(li, base_url).await.unwrap();
+
                     println!("{:?}", media_links);
                 }
             }
