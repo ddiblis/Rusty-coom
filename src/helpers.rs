@@ -1,16 +1,16 @@
+use bytes::Buf;
 use http::{header::COOKIE, HeaderMap, HeaderValue};
 use image::io::Reader as ImageReader;
-use select::predicate::{Class, Name};
-use select::document::Document;
 use image::ImageFormat;
+use select::document::Document;
+use select::predicate::{Class, Name};
 use std::io::Cursor;
-use bytes::Buf;
 
 async fn get_dom(url: &str) -> Result<Document, Box<dyn std::error::Error>> {
     let mut headers = HeaderMap::new();
     headers.append(COOKIE, HeaderValue::from_str("__ddg2=6fryH34fRixR8HCV")?);
 
-    println!("{}", url);
+    // println!("{}", url);
     let client = reqwest::Client::new();
     let resp = client.get(url).headers(headers).send().await?;
 
@@ -91,9 +91,7 @@ pub async fn get_media_links(
 
 pub async fn download_img(
     url: &str,
-    artist_name: &str,
-    page_index: usize,
-    post_index: usize,
+    location: &str,
     image_index: usize,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut headers = HeaderMap::new();
@@ -105,8 +103,5 @@ pub async fn download_img(
     let reader = ImageReader::new(Cursor::new(image)).with_guessed_format()?;
     assert_eq!(reader.format(), Some(ImageFormat::Jpeg));
     let img = reader.decode()?;
-    Ok(img.save(format!(
-        "coomer/{}/Page {:0>3}/Post {:0>3}/{:0>3}.jpg",
-        artist_name, page_index, post_index, image_index
-    ))?)
+    Ok(img.save(format!("{}/{:0>3}.jpg", location, image_index))?)
 }
