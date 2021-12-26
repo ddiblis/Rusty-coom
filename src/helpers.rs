@@ -8,7 +8,7 @@ use std::io::Cursor;
 use indicatif::{ProgressBar, ProgressStyle};
 
 pub fn get_pbar(length: u64, template: &str) -> Result<indicatif::ProgressBar, Box<dyn std::error::Error>> {
-    let bar = ProgressBar::new(length.try_into().unwrap());
+    let bar = ProgressBar::new(length);
     bar.set_style(
         ProgressStyle::default_bar()
             .template(template)
@@ -107,9 +107,9 @@ pub async fn download_img(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut headers = HeaderMap::new();
     headers.append(COOKIE, HeaderValue::from_str("__ddg2=6fryH34fRixR8HCV")?);
-
     let client = reqwest::Client::new();
     let resp = client.get(url).headers(headers).send().await?;
+
     let image = resp.bytes().await?;
     let reader = ImageReader::new(Cursor::new(image)).with_guessed_format()?;
     assert_eq!(reader.format(), Some(ImageFormat::Jpeg));
