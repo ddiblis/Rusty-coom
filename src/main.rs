@@ -1,6 +1,8 @@
 use futures::stream::FuturesUnordered;
+use futures::StreamExt;
 use indicatif::ProgressIterator;
-use std::fs;
+use tokio::sync::Semaphore;
+use std::{fs, sync::Arc};
 
 mod helpers;
 use helpers::{download_img, gen_links, get_media_links, get_page_num, get_pbar};
@@ -39,10 +41,16 @@ async fn get_images(
         post_index + 1
     ))?;
 
-    for (i, img) in links.iter().enumerate().progress_with(image_bar) {
+    let mut handles = FuturesUnordered::new();
+    let client = reqwest::Client::new();
+    let sem = Arc::new(Semaphore::new(20));
+    for (i, img) in links.iter().enumerate() {
         if img.split(".").last().unwrap() == "jpg" {
-            download_img(img, &location, i + 1).await.unwrap();
+            handles.push(download_img(img, &location, i + 1, client.clone(), sem.clone()));
         }
+    }
+    while let Some(_item) = handles.next().await {
+        image_bar.inc(1);
     }
     Ok(())
 }
@@ -71,28 +79,17 @@ async fn get_posts(
             x + 1,
         ),
         )?;
-        let handles = FuturesUnordered::new();
-        for (post_index, li) in posts_links.iter().enumerate().progress_with(post_bar) {
+        let mut handles = FuturesUnordered::new();
+        for (post_index, li) in posts_links.iter().enumerate() {
             let handle = async move {
-              let media_links = get_media_links(li, base_url).await.unwrap();
-              get_images(media_links, artist_name, x, post_index).await;
+                let media_links = get_media_links(li, base_url).await.unwrap();
+                get_images(media_links, artist_name, x, post_index).await;
             };
             handles.push(handle);
         }
-        //futures::future::join_all(handles).await;
         while let Some(_item) = handles.next().await {
-            post_bar.inc(1);
+            post_bar.inc(1)
         }
-        // let mut temp = FuturesUnordered::new();  
-
-        // for (post_index, li) in posts_links.iter().enumerate() {
-        //     let media_links = get_media_links(li, base_url).await?;
-        //     temp.push(get_images(media_links, artist_name, x, post_index))
-        // }
-        // while let Some(_item) = temp.next().await {
-        //     post_bar.inc(1)
-        // }
-        // post_bar.finish();
     }
     Ok(())
 }

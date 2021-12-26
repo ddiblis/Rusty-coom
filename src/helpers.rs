@@ -2,12 +2,20 @@ use bytes::Buf;
 use http::{header::COOKIE, HeaderMap, HeaderValue};
 use image::io::Reader as ImageReader;
 use image::ImageFormat;
+use indicatif::{ProgressBar, ProgressStyle};
 use select::document::Document;
 use select::predicate::{Class, Name};
+use tokio::sync::Semaphore;
 use std::io::Cursor;
-use indicatif::{ProgressBar, ProgressStyle};
+use std::sync::Arc;
 
-pub fn get_pbar(length: u64, template: &str) -> Result<indicatif::ProgressBar, Box<dyn std::error::Error>> {
+use futures::StreamExt;
+use tokio::io::AsyncWriteExt;
+
+pub fn get_pbar(
+    length: u64,
+    template: &str,
+) -> Result<indicatif::ProgressBar, Box<dyn std::error::Error>> {
     let bar = ProgressBar::new(length);
     bar.set_style(
         ProgressStyle::default_bar()
@@ -104,15 +112,20 @@ pub async fn download_img(
     url: &str,
     location: &str,
     image_index: usize,
+    client: reqwest::Client,
+    sem: Arc<Semaphore>
 ) -> Result<(), Box<dyn std::error::Error>> {
+    let _permit = sem.acquire_owned().await?;
     let mut headers = HeaderMap::new();
     headers.append(COOKIE, HeaderValue::from_str("__ddg2=6fryH34fRixR8HCV")?);
-    let client = reqwest::Client::new();
+    // let client = reqwest::Client::new();
     let resp = client.get(url).headers(headers).send().await?;
 
-    let image = resp.bytes().await?;
-    let reader = ImageReader::new(Cursor::new(image)).with_guessed_format()?;
-    assert_eq!(reader.format(), Some(ImageFormat::Jpeg));
-    let img = reader.decode()?;
-    Ok(img.save(format!("{}/{:0>3}.jpg", location, image_index))?)
+    let filename = format!("{}/{:0>3}.jpg", location, image_index);
+    let mut res = resp.bytes_stream();
+    let mut file = tokio::fs::File::create(filename.as_str()).await?;
+    while let Some(item) = res.next().await {
+        file.write_all_buf(&mut item?).await?;
+    }
+    Ok(())
 }
