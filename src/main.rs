@@ -43,9 +43,9 @@ async fn get_images(
 
     let mut handles = FuturesUnordered::new();
     let client = reqwest::Client::new();
-    let sem = Arc::new(Semaphore::new(20));
+    let sem = Arc::new(Semaphore::new(10));
     for (i, img) in links.iter().enumerate() {
-        if img.split(".").last().unwrap() == "jpg" {
+        if ["jpg", "mp4"].contains(&img.split(".").last().unwrap()) {
             handles.push(download_img(img, &location, i + 1, client.clone(), sem.clone()));
         }
     }

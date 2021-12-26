@@ -120,8 +120,8 @@ pub async fn download_img(
     headers.append(COOKIE, HeaderValue::from_str("__ddg2=6fryH34fRixR8HCV")?);
     // let client = reqwest::Client::new();
     let resp = client.get(url).headers(headers).send().await?;
-
-    let filename = format!("{}/{:0>3}.jpg", location, image_index);
+    let ext = url.split(".").last().unwrap();
+    let filename = format!("{}/{:0>3}.{}", location, image_index, ext);
     let mut res = resp.bytes_stream();
     let mut file = tokio::fs::File::create(filename.as_str()).await?;
     while let Some(item) = res.next().await {
