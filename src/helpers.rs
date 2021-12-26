@@ -5,6 +5,17 @@ use image::ImageFormat;
 use select::document::Document;
 use select::predicate::{Class, Name};
 use std::io::Cursor;
+use indicatif::{ProgressBar, ProgressStyle};
+
+pub fn get_pbar(length: u64, template: &str) -> Result<indicatif::ProgressBar, Box<dyn std::error::Error>> {
+    let bar = ProgressBar::new(length.try_into().unwrap());
+    bar.set_style(
+        ProgressStyle::default_bar()
+            .template(template)
+            .progress_chars("=>-"),
+    );
+    Ok(bar)
+}
 
 async fn get_dom(url: &str) -> Result<Document, Box<dyn std::error::Error>> {
     let mut headers = HeaderMap::new();

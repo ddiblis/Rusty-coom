@@ -1,32 +1,48 @@
-use linya::{Bar, Progress};
+use indicatif::ProgressIterator;
 use std::fs;
 
 mod helpers;
-use helpers::{download_img, gen_links, get_media_links, get_page_num};
+use helpers::{download_img, gen_links, get_media_links, get_page_num, get_pbar};
 
 #[tokio::main]
 async fn main() {
-    return get_site().await.unwrap();
+    // return get_site().await.unwrap();
+    return get_artist("https://coomer.party/onlyfans/user/jessabelletrix")
+        .await
+        .unwrap();
 }
 
-async fn get_images(links: Vec<String>, artist_name: &str, x: usize, post_index: usize) {
+async fn get_artist(artist_url: &str) -> Result<(), Box<dyn std::error::Error>> {
+    let base_url = "https://coomer.party";
+    let artist_name = artist_url.split("/").last().unwrap();
+    Ok(get_posts(artist_url, base_url, artist_name).await?)
+}
+
+async fn get_images(
+    links: Vec<String>,
+    artist_name: &str,
+    page_index: usize,
+    post_index: usize,
+) -> Result<(), Box<dyn std::error::Error>> {
     let location = format!(
         "coomer/{}/Page {:0>3}/Post {:0>3}",
         artist_name,
-        x + 1,
+        page_index + 1,
         post_index + 1
     );
     fs::create_dir_all(&location).unwrap();
-    let mut image_progress = Progress::new();
-    let image_bar: Bar = image_progress.bar(links.len(), format!("Downloading {} images", artist_name));
-
-    for (i, img) in links.iter().enumerate() {
-        image_progress.set_and_draw(&image_bar, i + 1);
+    let image_bar = get_pbar(links.len().try_into().unwrap(), &format!(
+        "Images for {}, Page {} post {} [{{elapsed_precise}}] {{bar:40.cyan/blue}} {{pos:1}}/{{len:5}}",
+        artist_name,
+        page_index + 1,
+        post_index + 1
+    ))?;
+    for (i, img) in links.iter().enumerate().progress_with(image_bar) {
         if img.split(".").last().unwrap() == "jpg" {
             download_img(img, &location, i + 1).await.unwrap();
         }
-        
     }
+    Ok(())
 }
 
 async fn get_posts(
@@ -35,23 +51,29 @@ async fn get_posts(
     artist_name: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let len = get_page_num(&site_page).await?;
-    let mut page_progress = Progress::new();
-    let page_bar: Bar = page_progress.bar(len, format!("Downloading {} Pages", artist_name));
+    let page_bar = get_pbar(
+        len.try_into().unwrap(),
+        &format!(
+            "Pages for {} [{{elapsed_precise}}] {{bar:40.cyan/blue}} {{pos:1}}/{{len:5}}",
+            artist_name
+        ),
+    )?;
 
-    for x in 0..len {
+    for x in (0..len).progress_with(page_bar) {
         let posts_links = gen_links(&site_page, "post-card__link", x, base_url).await?;
-        let mut post_progress = Progress::new();
-        let post_bar: Bar = post_progress.bar(
-            posts_links.len(),
-            format!("Downloading {} Posts", artist_name),
-        );
-        
-        for (post_index, li) in posts_links.iter().enumerate() {
+        let post_bar = get_pbar(
+            posts_links.len().try_into().unwrap(),
+            &format!(
+            "Posts for {}, Page {} [{{elapsed_precise}}] {{bar:40.cyan/blue}} {{pos:1}}/{{len:5}}",
+            artist_name,
+            x + 1,
+        ),
+        )?;
+
+        for (post_index, li) in posts_links.iter().enumerate().progress_with(post_bar) {
             let media_links = get_media_links(li, base_url).await?;
-            post_progress.set_and_draw(&post_bar, post_index + 1);
-            get_images(media_links, artist_name, x, post_index).await;
+            get_images(media_links, artist_name, x, post_index).await?;
         }
-        page_progress.set_and_draw(&page_bar, x + 1);
     }
     Ok(())
 }
@@ -61,12 +83,22 @@ async fn get_site() -> Result<(), Box<dyn std::error::Error>> {
     let url = "https://coomer.party/artists";
 
     let site_page_len = get_page_num(&url).await?;
-    for i in 0..site_page_len {
+    let site_bar = get_pbar(
+        site_page_len.try_into().unwrap(),
+        "Site coom.party [{elapsed_precise}] {bar:40.cyan/blue} {pos:1}/{len:5}",
+    )?;
+
+    for i in (0..site_page_len).progress_with(site_bar) {
         let site_pages = gen_links(&url, "user-card__name", i, base_url).await?;
-        for site_page in site_pages.iter() {
+        let artists_bar = get_pbar(
+            site_pages.len().try_into().unwrap(),
+            "Artists [{elapsed_precise}] {bar:40.cyan/blue} {pos:1}/{len:5}",
+        )?;
+
+        for site_page in site_pages.iter().progress_with(artists_bar) {
             let artist_name = site_page.split("/").last().unwrap();
 
-            get_posts(site_page, base_url, artist_name).await.unwrap();
+            get_posts(site_page, base_url, artist_name).await?;
         }
     }
     Ok(())
