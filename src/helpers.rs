@@ -2,28 +2,39 @@ use bytes::Buf;
 use http::{header::COOKIE, HeaderMap, HeaderValue};
 use image::io::Reader as ImageReader;
 use image::ImageFormat;
+use indicatif::{ProgressBar, ProgressStyle};
 use select::document::Document;
 use select::predicate::{Class, Name};
 use std::io::Cursor;
-use indicatif::{ProgressBar, ProgressStyle};
 
-pub fn get_pbar(length: u64, template: &str) -> Result<indicatif::ProgressBar, Box<dyn std::error::Error>> {
+pub fn get_pbar(
+    length: u64,
+    template: &str,
+) -> Result<indicatif::ProgressBar, Box<dyn std::error::Error>> {
     let bar = ProgressBar::new(length);
     bar.set_style(
         ProgressStyle::default_bar()
-            .template(template)
+            .template(&format!(
+                "{} [{{elapsed_precise}}] {{bar:40.cyan/blue}} {{pos:1}}/{{len:5}}",
+                template
+            ))
             .progress_chars("=>-"),
     );
     Ok(bar)
 }
 
-async fn get_dom(url: &str) -> Result<Document, Box<dyn std::error::Error>> {
+pub async fn gen_client() -> Result<reqwest::Client, Box<dyn std::error::Error>> {
+    Ok(reqwest::Client::new())
+}
+
+async fn get_dom(
+    url: &str,
+    client: &reqwest::Client,
+) -> Result<Document, Box<dyn std::error::Error>> {
     let mut headers = HeaderMap::new();
     headers.append(COOKIE, HeaderValue::from_str("__ddg2=6fryH34fRixR8HCV")?);
-
     // println!("{}", url);
-    let client = reqwest::Client::new();
-    let resp = client.get(url).headers(headers).send().await?;
+    let resp = client.clone().get(url).headers(headers).send().await?;
 
     assert!(resp.status().is_success());
 
@@ -37,8 +48,9 @@ pub async fn gen_links(
     class_name: &str,
     page_num: usize,
     base_url: &str,
+    client: &reqwest::Client
 ) -> Result<Vec<String>, Box<dyn std::error::Error>> {
-    let doc = get_dom(&format!("{}?o={:?}", &url, page_num * 25)).await?;
+    let doc = get_dom(&format!("{}?o={:?}", &url, page_num * 25), &client).await?;
     let mut links = Vec::new();
     for node in doc.find(Class(class_name)) {
         let name = node.find(Class("fancy-link")).next();
@@ -50,9 +62,9 @@ pub async fn gen_links(
     Ok(links)
 }
 
-pub async fn get_page_num(link: &str) -> Result<usize, Box<dyn std::error::Error>> {
+pub async fn get_page_num(link: &str, client: &reqwest::Client) -> Result<usize, Box<dyn std::error::Error>> {
     let mut page_len = 0;
-    let doc = get_dom(&link).await.unwrap();
+    let doc = get_dom(&link, &client).await.unwrap();
 
     for node in doc.find(Class("paginator")).next() {
         let small_node = node.find(Name("small")).next().unwrap().text();
@@ -70,9 +82,10 @@ pub async fn get_page_num(link: &str) -> Result<usize, Box<dyn std::error::Error
 pub async fn get_media_links(
     url: &str,
     base_url: &str,
+    client: &reqwest::Client
 ) -> Result<Vec<String>, Box<dyn std::error::Error>> {
     let mut links = Vec::new();
-    let dom = get_dom(url).await?;
+    let dom = get_dom(url, &client).await?;
 
     let items = match dom.clone() {
         value if value.find(Class("post__attachment-link")).next() != None => {
@@ -104,11 +117,11 @@ pub async fn download_img(
     url: &str,
     location: &str,
     image_index: usize,
+    client: &reqwest::Client,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut headers = HeaderMap::new();
     headers.append(COOKIE, HeaderValue::from_str("__ddg2=6fryH34fRixR8HCV")?);
-    let client = reqwest::Client::new();
-    let resp = client.get(url).headers(headers).send().await?;
+    let resp = client.clone().get(url).headers(headers).send().await?;
 
     let image = resp.bytes().await?;
     let reader = ImageReader::new(Cursor::new(image)).with_guessed_format()?;
