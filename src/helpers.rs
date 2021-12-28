@@ -1,27 +1,11 @@
 use bytes::Buf;
 use http::{header::COOKIE, HeaderMap, HeaderValue};
-use image::io::Reader as ImageReader;
-use image::ImageFormat;
 use indicatif::{ProgressBar, ProgressStyle};
 use select::document::Document;
 use select::predicate::{Class, Name};
 use std::io::Cursor;
-
-pub fn get_pbar(
-    length: u64,
-    template: &str,
-) -> Result<indicatif::ProgressBar, Box<dyn std::error::Error>> {
-    let bar = ProgressBar::new(length);
-    bar.set_style(
-        ProgressStyle::default_bar()
-            .template(&format!(
-                "{} [{{elapsed_precise}}] {{bar:40.cyan/blue}} {{pos:1}}/{{len:5}}",
-                template
-            ))
-            .progress_chars("=>-"),
-    );
-    Ok(bar)
-}
+use std::fs::File;
+use std::io::prelude::*;
 
 pub async fn gen_client() -> Result<reqwest::Client, Box<dyn std::error::Error>> {
     Ok(reqwest::Client::new())
@@ -95,8 +79,8 @@ pub async fn get_media_links(
             dom.find(Class("post__thumbnail"))
         }
         _ => dom.find(Class("test")),
+        
     };
-
     for item in items {
         let print = match item {
             value if value.attr("href") != None => value.attr("href"),
@@ -105,7 +89,8 @@ pub async fn get_media_links(
             }
             _ => Some("No"),
         };
-
+        // let link = print.unwrap().split("?").nth(0).unwrap();
+        
         if print.unwrap() != "No" {
             links.push([&base_url, print.unwrap()].join(""));
         }
@@ -117,15 +102,37 @@ pub async fn download_img(
     url: &str,
     location: &str,
     image_index: usize,
+    extension: &str,
     client: &reqwest::Client,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut headers = HeaderMap::new();
     headers.append(COOKIE, HeaderValue::from_str("__ddg2=6fryH34fRixR8HCV")?);
     let resp = client.clone().get(url).headers(headers).send().await?;
+    let data = resp.bytes().await?;
+    let name = format!("{}/{:0>3}.{}", location, image_index, extension);
 
-    let image = resp.bytes().await?;
-    let reader = ImageReader::new(Cursor::new(image)).with_guessed_format()?;
-    assert_eq!(reader.format(), Some(ImageFormat::Jpeg));
-    let img = reader.decode()?;
-    Ok(img.save(format!("{}/{:0>3}.jpg", location, image_index))?)
+    let mut pos = 0;
+    let mut buffer = File::create(name)?;
+
+    while pos < data.len() {
+        let bytes_written = buffer.write(&data[pos..])?;
+        pos += bytes_written;
+    }
+    Ok(())
+}
+
+pub fn get_pbar(
+    length: u64,
+    template: &str,
+) -> Result<indicatif::ProgressBar, Box<dyn std::error::Error>> {
+    let bar = ProgressBar::new(length);
+    bar.set_style(
+        ProgressStyle::default_bar()
+            .template(&format!(
+                "{} [{{elapsed_precise}}] {{bar:40.cyan/blue}} {{pos:1}}/{{len:5}}",
+                template
+            ))
+            .progress_chars("=>-"),
+    );
+    Ok(bar)
 }

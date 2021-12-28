@@ -12,7 +12,7 @@ pub async fn get_pages(
     let mut handles_pages = FuturesUnordered::new();
     let len = get_page_num(&site_page, &client).await?;
     let page_bar = get_pbar(
-        len.try_into().unwrap(),
+        len as u64,
         &format!("Pages for {}", artist_name),
     )?;
     for x in 0..len {
@@ -22,6 +22,7 @@ pub async fn get_pages(
             let posts_links = gen_links(&site_page, "post-card__link", x, base_url, post_client)
                 .await
                 .unwrap();
+                
             get_posts(posts_links, artist_name, x, base_url, page_client)
                 .await
                 .unwrap();

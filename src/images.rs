@@ -25,11 +25,11 @@ pub async fn get_images(
           post_index + 1
       ),
   )?;
-
+  
   for (i, img) in links.iter().enumerate().progress_with(image_bar) {
-      if img.split(".").last().unwrap() == "jpg" {
-          download_img(img, &location, i + 1, &client).await.unwrap();
-      }
+    let extension = img.split(".").last().unwrap();
+
+          download_img(img, &location, i + 1, extension, &client).await.unwrap();
   }
   Ok(())
 }
