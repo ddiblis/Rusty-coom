@@ -1,21 +1,14 @@
 use indicatif::ProgressIterator;
-use crate::helpers::{download_img, get_pbar};
-use std::fs;
+use crate::helpers::{download_media, get_pbar};
 
-pub async fn get_images(
+pub async fn get_media(
   links: Vec<String>,
   artist_name: &str,
   page_index: usize,
   post_index: usize,
+  location: &str,
   client: &reqwest::Client
 ) -> Result<(), Box<dyn std::error::Error>> {
-  let location = format!(
-      "coomer/{}/Page {:0>3}/Post {:0>3}",
-      artist_name,
-      page_index + 1,
-      post_index + 1
-  );
-  fs::create_dir_all(&location).unwrap();
   let image_bar = get_pbar(
       links.len() as u64,
       &format!(
@@ -25,11 +18,12 @@ pub async fn get_images(
           post_index + 1
       ),
   )?;
+
   
   for (i, img) in links.iter().enumerate().progress_with(image_bar) {
     let extension = img.split(".").last().unwrap();
 
-          download_img(img, &location, i + 1, extension, &client).await.unwrap();
+          download_media(img, &location, i + 1, extension, &client).await.unwrap();
   }
   Ok(())
 }

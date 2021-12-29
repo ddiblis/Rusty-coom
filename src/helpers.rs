@@ -3,9 +3,31 @@ use http::{header::COOKIE, HeaderMap, HeaderValue};
 use indicatif::{ProgressBar, ProgressStyle};
 use select::document::Document;
 use select::predicate::{Class, Name};
-use std::io::Cursor;
-use std::fs::File;
+use std::fmt;
+use std::fs::{write, File};
 use std::io::prelude::*;
+use std::io::Cursor;
+
+pub struct Post {
+    pub photos: Vec<String>,
+    pub videos: Vec<String>,
+    pub text: String,
+}
+
+impl fmt::Debug for Post {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "{{
+            Photos: {:?}
+            Videos: {:?}
+            Text: {:?}
+
+        }}",
+            self.photos, self.videos, self.text
+        )
+    }
+}
 
 pub async fn gen_client() -> Result<reqwest::Client, Box<dyn std::error::Error>> {
     Ok(reqwest::Client::new())
@@ -32,7 +54,7 @@ pub async fn gen_links(
     class_name: &str,
     page_num: usize,
     base_url: &str,
-    client: &reqwest::Client
+    client: &reqwest::Client,
 ) -> Result<Vec<String>, Box<dyn std::error::Error>> {
     let doc = get_dom(&format!("{}?o={:?}", &url, page_num * 25), &client).await?;
     let mut links = Vec::new();
@@ -46,7 +68,10 @@ pub async fn gen_links(
     Ok(links)
 }
 
-pub async fn get_page_num(link: &str, client: &reqwest::Client) -> Result<usize, Box<dyn std::error::Error>> {
+pub async fn get_page_num(
+    link: &str,
+    client: &reqwest::Client,
+) -> Result<usize, Box<dyn std::error::Error>> {
     let mut page_len = 0;
     let doc = get_dom(&link, &client).await.unwrap();
 
@@ -63,42 +88,56 @@ pub async fn get_page_num(link: &str, client: &reqwest::Client) -> Result<usize,
     Ok(page_len)
 }
 
+fn get_media(dom: Document, base_url: &str, name: &str, media_type: bool) -> Vec<String> {
+    let mut links = Vec::new();
+    let items = match dom.clone() {
+        value if value.find(Class(name)).next() != None => dom.find(Class(name)),
+        _ => dom.find(Class("test")),
+    };
+
+    if media_type {
+        for item in items {
+            let print = match item {
+                value if value.attr("href") != None => value.attr("href"),
+                _ => Some("No"),
+            };
+            // let link = print.unwrap().split("?").nth(0).unwrap();
+            if print.unwrap() != "No" {
+                links.push([&base_url, print.unwrap()].join(""));
+            }
+        }
+    } else {
+        for item in items {
+            let print = match item {
+                value if value.find(Name("img")).next().unwrap().attr("src") != None => {
+                    value.find(Name("img")).next().unwrap().attr("src")
+                }
+                _ => Some("No"),
+            };
+            // let link = print.unwrap().split("?").nth(0).unwrap();
+            if print.unwrap() != "No" {
+                links.push([&base_url, print.unwrap()].join(""));
+            }
+        }
+    }
+    return links;
+}
+
 pub async fn get_media_links(
     url: &str,
     base_url: &str,
-    client: &reqwest::Client
-) -> Result<Vec<String>, Box<dyn std::error::Error>> {
-    let mut links = Vec::new();
+    client: &reqwest::Client,
+) -> Result<Post, Box<dyn std::error::Error>> {
     let dom = get_dom(url, &client).await?;
-
-    let items = match dom.clone() {
-        value if value.find(Class("post__attachment-link")).next() != None => {
-            dom.find(Class("post__attachment-link"))
-        }
-        value if value.find(Class("post__thumbnail")).next() != None => {
-            dom.find(Class("post__thumbnail"))
-        }
-        _ => dom.find(Class("test")),
-        
-    };
-    for item in items {
-        let print = match item {
-            value if value.attr("href") != None => value.attr("href"),
-            value if value.find(Name("img")).next().unwrap().attr("src") != None => {
-                value.find(Name("img")).next().unwrap().attr("src")
-            }
-            _ => Some("No"),
-        };
-        // let link = print.unwrap().split("?").nth(0).unwrap();
-        
-        if print.unwrap() != "No" {
-            links.push([&base_url, print.unwrap()].join(""));
-        }
-    }
-    Ok(links)
+    let textpost = dom.clone().find(Name("pre")).next().unwrap().text();
+    Ok(Post {
+        photos: get_media(dom.clone(), base_url, "post__attachment-link", true),
+        videos: get_media(dom.clone(), base_url, "post__thumbnail", false),
+        text: textpost,
+    })
 }
 
-pub async fn download_img(
+pub async fn download_media(
     url: &str,
     location: &str,
     image_index: usize,
@@ -119,6 +158,13 @@ pub async fn download_img(
         pos += bytes_written;
     }
     Ok(())
+}
+pub fn download_text(text: &str, location: &str) {
+    let name = format!("{}/post", location);
+    if text.trim().is_empty() {
+        return
+    }
+    write(name, text).expect("no text post for this post");
 }
 
 pub fn get_pbar(

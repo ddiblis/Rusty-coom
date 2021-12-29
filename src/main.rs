@@ -1,5 +1,5 @@
 mod helpers;
-mod images;
+mod media;
 mod pages;
 mod posts;
 use helpers::gen_client;
