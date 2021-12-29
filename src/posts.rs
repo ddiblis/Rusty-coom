@@ -1,7 +1,7 @@
 use futures::stream::futures_unordered::FuturesUnordered;
 use futures::StreamExt;
 
-use crate::helpers::{get_media_links, get_pbar, download_text};
+use crate::helpers::{download_text, get_media_links, get_pbar};
 use crate::media::get_media;
 use std::fs;
 
@@ -19,41 +19,23 @@ pub async fn get_posts(
   )?;
   for (post_index, li) in posts_links.iter().enumerate() {
     let location = format!(
-      "coomer/{}/Page {:0>3}/Post {:0>3}",
+      "{}/Page {:0>3}/Post {:0>3}",
       artist_name,
       page_index + 1,
       post_index + 1
     );
-    fs::create_dir_all(&location).unwrap();
+    fs::create_dir_all(format!("coomer/{}", location)).unwrap();
 
     let handle = async move {
       let post = get_media_links(li, base_url, &client).await.unwrap();
 
       if post.photos.len() > 1 {
-        get_media(
-          post.photos,
-          artist_name,
-          page_index,
-          post_index,
-          &location,
-          &client,
-        )
-        .await
-        .unwrap();
+        get_media(post.photos, &location, &client).await.unwrap();
       }
       if post.videos.len() > 1 {
-        get_media(
-          post.videos,
-          artist_name,
-          page_index,
-          post_index,
-          &location,
-          &client,
-        )
-        .await
-        .unwrap();
+        get_media(post.videos, &location, &client).await.unwrap();
       }
-      download_text(&post.text, &location);
+      download_text(&post.text, &location).await;
     };
     handles_posts.push(handle);
   }

@@ -7,6 +7,8 @@ use std::fmt;
 use std::fs::{write, File};
 use std::io::prelude::*;
 use std::io::Cursor;
+use std::sync::Arc;
+use tokio::sync::Semaphore;
 
 pub struct Post {
     pub photos: Vec<String>,
@@ -143,12 +145,14 @@ pub async fn download_media(
     image_index: usize,
     extension: &str,
     client: &reqwest::Client,
+    semaphore: Arc<Semaphore>,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    let _permit = semaphore.acquire_owned().await?;
     let mut headers = HeaderMap::new();
     headers.append(COOKIE, HeaderValue::from_str("__ddg2=6fryH34fRixR8HCV")?);
     let resp = client.clone().get(url).headers(headers).send().await?;
     let data = resp.bytes().await?;
-    let name = format!("{}/{:0>3}.{}", location, image_index, extension);
+    let name = format!("coomer/{}/{:0>3}.{}", location, image_index, extension);
 
     let mut pos = 0;
     let mut buffer = File::create(name)?;
@@ -159,12 +163,13 @@ pub async fn download_media(
     }
     Ok(())
 }
-pub fn download_text(text: &str, location: &str) {
-    let name = format!("{}/post", location);
+
+pub async fn download_text(text: &str, location: &str) {
+    let name = format!("coomer/{}/post", location);
     if text.trim().is_empty() {
-        return
+        return;
     }
-    write(name, text).expect("no text post for this post");
+    write(name, text).expect("oops you fucked up");
 }
 
 pub fn get_pbar(
