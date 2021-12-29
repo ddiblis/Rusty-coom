@@ -3,12 +3,15 @@ use http::{header::COOKIE, HeaderMap, HeaderValue};
 use indicatif::{ProgressBar, ProgressStyle};
 use select::document::Document;
 use select::predicate::{Class, Name};
+use std::collections::HashSet;
 use std::fmt;
-use std::fs::{write, File};
-use std::io::prelude::*;
+use std::fs::write;
 use std::io::Cursor;
 use std::sync::Arc;
 use tokio::sync::Semaphore;
+
+use futures::StreamExt;
+use tokio::io::AsyncWriteExt;
 
 pub struct Post {
     pub photos: Vec<String>,
@@ -130,11 +133,17 @@ pub async fn get_media_links(
     base_url: &str,
     client: &reqwest::Client,
 ) -> Result<Post, Box<dyn std::error::Error>> {
+    let mut clean_videos = Vec::new();
     let dom = get_dom(url, &client).await?;
     let textpost = dom.clone().find(Name("pre")).next().unwrap().text();
+    let vids = get_media(dom.clone(), base_url, "post__attachment-link", true);
+    let vid_hash: HashSet<_> = vids.into_iter().collect();
+    for vid in vid_hash.iter() {
+        clean_videos.push(vid.to_string());
+    }
     Ok(Post {
-        photos: get_media(dom.clone(), base_url, "post__attachment-link", true),
-        videos: get_media(dom.clone(), base_url, "post__thumbnail", false),
+        videos: clean_videos,
+        photos: get_media(dom.clone(), base_url, "post__thumbnail", false),
         text: textpost,
     })
 }
@@ -144,22 +153,19 @@ pub async fn download_media(
     location: &str,
     image_index: usize,
     extension: &str,
-    client: &reqwest::Client,
+    client: reqwest::Client,
     semaphore: Arc<Semaphore>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let _permit = semaphore.acquire_owned().await?;
     let mut headers = HeaderMap::new();
     headers.append(COOKIE, HeaderValue::from_str("__ddg2=6fryH34fRixR8HCV")?);
     let resp = client.clone().get(url).headers(headers).send().await?;
-    let data = resp.bytes().await?;
+    let mut data = resp.bytes_stream();
     let name = format!("coomer/{}/{:0>3}.{}", location, image_index, extension);
 
-    let mut pos = 0;
-    let mut buffer = File::create(name)?;
-
-    while pos < data.len() {
-        let bytes_written = buffer.write(&data[pos..])?;
-        pos += bytes_written;
+    let mut file = tokio::fs::File::create(name).await?;
+    while let Some(item) = data.next().await {
+        file.write_all_buf(&mut item?).await?;
     }
     Ok(())
 }
@@ -173,17 +179,17 @@ pub async fn download_text(text: &str, location: &str) {
 }
 
 pub fn get_pbar(
-    length: u64,
+    len: u64,
     template: &str,
 ) -> Result<indicatif::ProgressBar, Box<dyn std::error::Error>> {
-    let bar = ProgressBar::new(length);
+    let bar = ProgressBar::new(len);
     bar.set_style(
         ProgressStyle::default_bar()
             .template(&format!(
                 "{} [{{elapsed_precise}}] {{bar:40.cyan/blue}} {{pos:1}}/{{len:5}}",
                 template
             ))
-            .progress_chars("=>-"),
+            .progress_chars("#>="),
     );
     Ok(bar)
 }
