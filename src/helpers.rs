@@ -135,7 +135,10 @@ pub async fn get_media_links(
 ) -> Result<Post, Box<dyn std::error::Error>> {
     let mut clean_videos = Vec::new();
     let dom = get_dom(url, &client).await?;
-    let textpost = dom.clone().find(Name("pre")).next().unwrap().text();
+    let textpost = match dom.clone() {
+        value if value.find(Name("pre")).next() != None => value.find(Name("pre")).next().unwrap().text(),
+        _ => "".to_string()
+    };
     let vids = get_media(dom.clone(), base_url, "post__attachment-link", true);
     let vid_hash: HashSet<_> = vids.into_iter().collect();
     for vid in vid_hash.iter() {
@@ -189,7 +192,7 @@ pub fn get_pbar(
                 "{} [{{elapsed_precise}}] {{bar:40.cyan/blue}} {{pos:1}}/{{len:5}}",
                 template
             ))
-            .progress_chars("#>="),
+            .progress_chars("#>-"),
     );
     Ok(bar)
 }

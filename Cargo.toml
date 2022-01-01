@@ -7,11 +7,10 @@ edition = "2021"
 
 [dependencies]
 reqwest = { version = "0.11", features = ["json", "blocking", "cookies", "stream"] }
+clap = { version = "3.0.0-rc.9", features = ["derive"] }
 tokio = { version = "1", features = ["full"] }
 select = { version = "0.5.0" }
 indicatif = "0.16.2"
 futures = "0.3.19"
-image = "0.23.14"
-linya = "0.2.1"
 http = "0.2.5"
 bytes = "1"

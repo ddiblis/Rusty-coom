@@ -11,23 +11,25 @@ pub async fn get_media(
   location: &str,
   client: &reqwest::Client,
 ) -> Result<(), Box<dyn std::error::Error>> {
-  let semaphore = Arc::new(Semaphore::new(15));
-  let mut handles = FuturesUnordered::new();
-  let media_bar = get_pbar(links.len() as u64, &format!("Media for {}", &location))?;
-
-  for (i, media) in links.iter().enumerate() {
-    let extension = media.split(".").last().unwrap();
-    handles.push(download_media(
-      media,
-      &location,
-      i + 1,
-      extension,
-      client.clone(),
-      semaphore.clone(),
-    ));
-  }
-  while let Some(_item) = handles.next().await {
-    media_bar.inc(1);
+  if links.len() > 0 {
+    let semaphore = Arc::new(Semaphore::new(10));
+    let mut handles = FuturesUnordered::new();
+    let media_bar = get_pbar(links.len() as u64, &format!("Media for {}", &location))?;
+  
+    for (i, media) in links.iter().enumerate() {
+      let extension = media.split(".").last().unwrap();
+      handles.push(download_media(
+        media,
+        &location,
+        i + 1,
+        extension,
+        client.clone(),
+        semaphore.clone(),
+      ));
+    }
+    while let Some(_item) = handles.next().await {
+      media_bar.inc(1);
+    }
   }
   Ok(())
 }

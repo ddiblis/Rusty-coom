@@ -13,7 +13,7 @@ pub async fn get_posts(
 ) -> Result<(), Box<dyn std::error::Error>> {
   let post_bar = get_pbar(
     posts_links.len() as u64,
-    &format!("Posts for {}, Page {:0>3}", artist_name, page_index + 1,),
+    &format!("Posts for {}, Page {:0>3}", artist_name, page_index + 1)
   )?;
   for (post_index, li) in posts_links.iter().enumerate().progress_with(post_bar) {
     let location = format!(
@@ -26,12 +26,8 @@ pub async fn get_posts(
 
     let post = get_media_links(li, base_url, &client).await.unwrap();
 
-    if post.photos.len() > 0 {
-      get_media(post.photos, &location, &client).await.unwrap();
-    }
-    if post.videos.len() > 0 {
-      get_media(post.videos, &location, &client).await.unwrap();
-    }
+    get_media(post.photos, &location, &client).await.unwrap();
+    get_media(post.videos, &location, &client).await.unwrap();
     download_text(&post.text, &location).await;
   }
   Ok(())
