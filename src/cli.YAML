@@ -1,0 +1,29 @@
+name: rusty-coom
+version: "1.0"
+author: Wafiq A. <wafiqaladwan@gmail.com>
+about: Web scraper and file downloader for coomer.perty and kimono.party
+args:
+    - artist_url:
+        short: u
+        long: artist_url
+        value_name: url
+        about: URL of artist to parse
+        takes_value: true
+    - artist_name:
+        short: n
+        long: artist_name
+        value_name: name
+        about: Name of artist to parse
+        takes_value: true
+    - many_artists:
+        short: m
+        long: many
+        value_name: name
+        about: Input many links or artist names separated by spaces to download
+        takes_value: true
+    - all_sites:
+        short: a
+        long: all_sites
+        value_name: all_sites
+        about: Flag for downloading artist posts from all websites coded in
+        takes_value: true
