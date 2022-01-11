@@ -4,6 +4,7 @@ mod pages;
 mod posts;
 use clap;
 use helpers::gen_client;
+use pages::get_pages;
 
 #[tokio::main]
 async fn main() {
@@ -27,30 +28,40 @@ async fn main() {
         if matches.is_present("coomer") {
             println!("In coomer");
             let base_url = "https://coomer.party";
-            println!("{:?}", matches.value_of("artist"));
+            if matches.is_present("artist_url") {
+                return get_artist(matches.value_of("artist_url").unwrap(), &client, base_url)
+                .await
+                .unwrap();
+            }
+            else if matches.is_present("artist_name") {
+                return get_artist(&format!("https://coomer.party/onlyfans/user/{}", matches.value_of("artist_name").unwrap()), &client, base_url)
+                .await
+                .unwrap();
+            }
         }
+
         else if matches.is_present("kemono") {
             println!("In kemono");
             let base_url = "https://kemono.party";
-            println!("{:?}", matches.value_of("artist"))
+            if matches.is_present("artist_url"){
+                return get_artist(matches.value_of("artist_url").unwrap(), &client, base_url)
+                .await
+                .unwrap();
+            }
+            else if matches.is_present("artist_index") {
+                return get_artist(&format!("https://coomer.party/onlyfans/user/{}", matches.value_of("artist_index").unwrap()), &client, base_url)
+                .await
+                .unwrap();
+            }
         }
 
 }
 
-// #[tokio::main]
-// async fn main() {
-//     // return get_site().await.unwrap();
-//     let client = gen_client().await.unwrap();
-//     return get_artist("https://coomer.party/onlyfans/user/hidorirose", &client)
-//         .await
-//         .unwrap();
-// }
-
-// async fn get_artist(
-//     artist_url: &str,
-//     client: &reqwest::Client,
-// ) -> Result<(), Box<dyn std::error::Error>> {
-//     let base_url = "https://coomer.party";
-//     let artist_name = artist_url.split("/").last().unwrap();
-//     Ok(get_pages(artist_url, base_url, artist_name, client).await?)
-// }
+async fn get_artist(
+    artist_url: &str,
+    client: &reqwest::Client,
+    base_url: &str
+) -> Result<(), Box<dyn std::error::Error>> {
+    let artist_name = artist_url.split("/").last().unwrap();
+    Ok(get_pages(artist_url, base_url, artist_name, client).await?)
+}
