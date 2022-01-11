@@ -2,59 +2,40 @@ mod helpers;
 mod media;
 mod pages;
 mod posts;
+use clap;
+use helpers::gen_client;
 
+#[tokio::main]
+async fn main() {
+        let client = gen_client().await.unwrap();
+        let matches = clap::clap_app!(myapp =>
+            (version: "1.0")
+            (author: "Wafiq A. <wafiqaladwan@gmail.com>")
+            (about: "Parses and downloads all artist content from a select few websites")
+            (@group site +required =>  
+                (@arg coomer: -c --coomer "Sets parse to coomer.party")
+                (@arg kemono: -k --kemono "Sets parser to kemono.party")
+            )
+            (@group artist +required => 
+                (@arg artist_url: -u --artist_url +takes_value "URL of artist to parse")
+                (@arg artist_name: -n --artist_name +takes_value "Name of artist to parse for coomer")
+                (@arg artist_index: -i --artist_index +takes_value "Number of artist to parse for kemono")
+            )
+            (@arg many_artists: -m --many_artists "A true or false flag for downloading many artists")
+        ).get_matches();
 
+        if matches.is_present("coomer") {
+            println!("In coomer");
+            let base_url = "https://coomer.party";
+            println!("{:?}", matches.value_of("artist"));
+        }
+        else if matches.is_present("kemono") {
+            println!("In kemono");
+            let base_url = "https://kemono.party";
+            println!("{:?}", matches.value_of("artist"))
+        }
 
-// use clap::{App, Arg, SubCommand};
-
-// fn main() {
-//     let matches = App::new("My Super Program")
-//         .version("1.0")
-//         .author("Kevin K. <kbknapp@gmail.com>")
-//         .about("Does awesome things")
-//         .arg(
-//             Arg::new("artist_url")
-//                 .short('u')
-//                 .long("artist_url")
-//                 .value_name("url")
-//                 .help("URL of artist to parse")
-//                 .takes_value(true),
-//         )
-//         .arg(
-//             Arg::new("artist_name")
-//             .short('n')
-//             .long("artist_name")
-//             .value_name("name")
-//             .help("Name of artist to parse")
-//             .takes_value(true)
-//         )
-//         .get_matches();
-        // .arg(
-        //     Arg::new("many artists")
-        //     .short('m')
-        //     .long("many")
-        //     .value_name("many")
-        //     .help("input many links or artist names separated by spaces to download")
-        //     .takes_value(true)
-        // )
-        // .arg(
-        //     Arg::new("site")
-        //     .short('s')
-        //     .long("site")
-        //     .value_name("site_name")
-        //     .help("choose between coomer.party and kemono.party")
-        //     .takes_value(true)
-        // )
-        // .arg(
-        //     Arg::new("all_sites")
-        //     .short('a')
-        //     .long("all_sites")
-        //     .value_name("all_sites")
-        //     .help("Flag for downloading artist posts from all websites coded in")
-        //     .takes_value(true)
-        // )
-//     println!("{}", matches.value_of("artist_url").unwrap_or("No match"));
-// }
+}
 
 // #[tokio::main]
 // async fn main() {
@@ -73,25 +54,3 @@ mod posts;
 //     let artist_name = artist_url.split("/").last().unwrap();
 //     Ok(get_pages(artist_url, base_url, artist_name, client).await?)
 // }
-
-// use clap;
-
-fn main() {
-    println!("NO")
-    // let matches = clap::clap_app!(myapp =>
-    //     (version: "1.0")
-    //     (author: "Kevin K. <kbknapp@gmail.com>")
-    //     (about: "Does awesome things")
-    //     (@arg CONFIG: -c --config +takes_value "Sets a custom config file")
-    //     (@arg INPUT: +required "Sets the input file to use")
-    //     (@arg verbose: -v --verbose "Print test information verbosely")
-    //     (@subcommand test =>
-    //         (about: "controls testing features")
-    //         (version: "1.3")
-    //         (author: "Someone E. <someone_else@other.com>")
-    //         (@arg debug: -d ... "Sets the level of debugging information")
-    //     )
-    // ).get_matches();
-
-    // Same as previous examples...
-}
